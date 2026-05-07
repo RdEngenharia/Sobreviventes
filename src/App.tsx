@@ -20,14 +20,14 @@ export default function App() {
       const stateWithIntervention = { ...currentTurn, intervencao_usuario: intervention };
       const nextTurn = await generateNextTurn(stateWithIntervention);
       setHistory(prev => [...prev, nextTurn]);
-      setIntervention(""); // Clear after use
+      setIntervention(""); // Limpa após o uso
       
       setTimeout(() => {
         scrollRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     } catch (err: any) {
       console.error(err);
-      setError("Falha na sincronização. A ilha está instável.");
+      setError(err.message || "Falha na sincronização. A ilha está instável.");
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,7 @@ export default function App() {
         <section className="bg-emerald-950/20 border border-emerald-500/10 rounded-2xl p-6 backdrop-blur-md">
           <div className="flex items-center gap-2 mb-4 text-emerald-400 text-[10px] uppercase tracking-[0.3em] font-bold">
             <Sparkles className="w-4 h-4" />
-            Terminal de Intervenção ao Vivo
+            Terminal de Intervenção
           </div>
           <div className="flex gap-4">
             <input 
@@ -116,20 +116,21 @@ export default function App() {
               value={intervention}
               onChange={(e) => setIntervention(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleNextTurn()}
-              placeholder="Digite um evento (ex: 'Um coqueiro carregado aparece', 'Canoa avistada')..."
+              placeholder="Digite um evento (ex: 'Um coqueiro aparece', 'Tempestade tropical')..."
               className="flex-1 bg-black/40 border border-white/10 rounded-xl px-5 py-3 text-sm focus:outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600 text-emerald-50"
             />
             <button 
               onClick={handleNextTurn}
               disabled={loading}
-              className="px-6 py-3 bg-emerald-500 text-black text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-30 flex items-center gap-2"
+              className="px-6 py-3 bg-emerald-500 text-black text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-30 flex items-center gap-2 whitespace-nowrap"
             >
-              Intervir e Ciclar
+              {loading ? "Processando..." : "Próximo Turno"}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+          {error && <p className="mt-3 text-[10px] text-red-500 uppercase tracking-widest font-bold font-mono">{error}</p>}
           <p className="mt-3 text-[10px] text-zinc-500 italic opacity-60">
-            * A intervenção será injetada no próximo ciclo de inteligência da ilha.
+            * Inicie a intervenção ou apenas clique em "Próximo Turno" para a IA decidir o destino deles.
           </p>
         </section>
 
@@ -138,13 +139,13 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-black/60 border border-white/5 rounded-2xl p-8 font-mono text-sm relative overflow-hidden"
+            className="bg-black/60 border border-white/5 rounded-3xl p-8 font-mono text-sm relative overflow-hidden"
           >
-            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50" />
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500/30" />
             <div className="flex items-center gap-2 mb-4 text-zinc-500 text-[9px] uppercase tracking-widest font-bold">
-              LOG_CYCLE_FINALIZATION
+              SYSTEM_CYCLE_STATE // {history.length}
             </div>
-            <p className="text-emerald-400/90 leading-relaxed text-base italic">
+            <p className="text-emerald-400/90 leading-relaxed text-lg italic">
               {currentTurn.resultado_final}
             </p>
             {loading && (
@@ -156,16 +157,16 @@ export default function App() {
                       transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
                       className="absolute inset-0 border-t-2 border-r-2 border-emerald-500 rounded-full"
                     />
-                    <div className="absolute inset-2 border-t border-emerald-500/20 rounded-full animate-pulse" />
                     <Activity className="absolute inset-0 m-auto w-6 h-6 text-emerald-500" />
                   </div>
-                  <span className="text-[10px] uppercase tracking-[0.5em] text-emerald-500 animate-pulse font-bold">Processando Variáveis da Ilha...</span>
+                  <span className="text-[10px] uppercase tracking-[0.5em] text-emerald-500 animate-pulse font-bold">Calculando Variáveis da Ilha...</span>
                 </div>
               </div>
             )}
           </motion.div>
         </div>
       </main>
+
 
       {/* Decorative */}
       <footer className="p-10 text-center opacity-30">
@@ -177,7 +178,7 @@ export default function App() {
   );
 }
 
-function AgentCard({ agent, delay }: { agent: Agent; delay: number }) {
+function AgentCard({ agent, delay }: { agent: Agent; delay: number; key?: React.Key }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -229,7 +230,7 @@ function AgentCard({ agent, delay }: { agent: Agent; delay: number }) {
   );
 }
 
-function StatBar({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function StatBar({ icon, label, value, color }: { icon: any; label: string; value: number; color: string }) {
   return (
     <div className="space-y-1">
       <div className="flex justify-between items-center text-[8px] uppercase tracking-wider text-zinc-500 font-bold">
