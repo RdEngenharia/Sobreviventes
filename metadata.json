@@ -1,0 +1,6 @@
+{
+  "name": "Nexus Survival Engine",
+  "description": "An autonomous life simulation managing three agents in a hostile environment using reactive AI logic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
