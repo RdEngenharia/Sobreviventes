@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { TurnData } from "./types";
+import { TurnData } from "../types";
 
 const SYSTEM_PROMPT = `
 Você é o Motor de Simulação de Vida Autônoma (Island Survival Engine).
@@ -13,18 +13,16 @@ Seu objetivo é gerenciar a vida de 5 sobreviventes em uma ilha deserta hostil e
 REGRAS DA ILHA:
 - Status de 0 a 100: FOME, ENERGIA, SANIDADE, SEDE.
 - Perigos: Animais selvagens, tribos nativas hostis, desidratação, insolação, relevo perigoso.
-- Objetivo: Sobreviver até o resgate (que pode demorar turnos indeterminados).
+- Objetivo: Sobreviver até o resgate.
 - MEMÓRIA: Agentes lembram de conflitos e ajudas.
-- INTERVENÇÃO DIVINA: Se o campo "intervencao_usuario" estiver preenchido, você DEVE incorporar esse evento ou item imediatamente na narrativa deste turno (ex: um coqueiro aparece, um raio cai, etc).
+- INTERVENÇÃO DIVINA: Se houver uma intervenção do usuário no estado anterior, incorpore-a IMEDIATAMENTE.
 
-PERSONAGENS (Mantenha as profissões):
-1. Médico (Marcos): Foco em saúde.
-2. Engenheira (Elena): Foco em infraestrutura.
-3. Cozinheira (Sofia): Foco em recursos alimentares.
-4. Advogado (Ricardo): Foco em liderança/social.
-5. Guia Turístico (Tiago): Foco em exploração.
-
-RETORNO: Estritamente JSON conforme o schema.
+PERSONAGENS:
+1. Marcos (Médico)
+2. Elena (Engenheira)
+3. Sofia (Cozinheira)
+4. Ricardo (Advogado)
+5. Tiago (Guia Turístico)
 `;
 
 const RESPONSE_SCHEMA = {
@@ -63,11 +61,11 @@ const RESPONSE_SCHEMA = {
 
 let ai: GoogleGenAI | null = null;
 
-export function getAI() {
+function getAI() {
   if (!ai) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not defined in the environment.");
+      throw new Error("GEMINI_API_KEY não encontrada.");
     }
     ai = new GoogleGenAI({ apiKey });
   }
@@ -75,16 +73,14 @@ export function getAI() {
 }
 
 export async function generateNextTurn(previousTurn: TurnData): Promise<TurnData> {
-  const genAI = getAI();
+  const client = getAI();
   
-  const response = await genAI.models.generateContent({
+  const response = await client.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `Gere o próximo turno com base neste estado atual: ${JSON.stringify(previousTurn)}` }]
-      }
-    ],
+    contents: [{ 
+      role: "user", 
+      parts: [{ text: `Gere o próximo turno: ${JSON.stringify(previousTurn)}` }] 
+    }],
     config: {
       systemInstruction: SYSTEM_PROMPT,
       responseMimeType: "application/json",
@@ -93,9 +89,7 @@ export async function generateNextTurn(previousTurn: TurnData): Promise<TurnData
   });
 
   const text = response.text;
-  if (!text) {
-    throw new Error("No response text from Gemini");
-  }
+  if (!text) throw new Error("IA não retornou dados.");
 
   return JSON.parse(text) as TurnData;
 }

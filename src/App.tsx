@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Activity, Brain, Battery, Utensils, AlertTriangle, ChevronRight, Droplets, Terminal, Sparkles, UserPlus } from "lucide-react";
 import { Agent, INITIAL_STATE, TurnData } from "./types";
