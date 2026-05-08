@@ -1,37 +1,88 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Activity, Brain, Battery, Utensils, AlertTriangle, ChevronRight, Droplets, Terminal, Sparkles, UserPlus } from "lucide-react";
+import { Activity, Brain, Battery, Utensils, AlertTriangle, ChevronRight, Droplets, Terminal, Sparkles, RotateCcw, Clock } from "lucide-react";
 import { Agent, INITIAL_STATE, TurnData } from "./types";
 import { generateNextTurn } from "./services/geminiService";
 
+const AUTO_UPDATE_INTERVAL = 3 * 60 * 60 * 1000; // 3 horas em milissegundos
+
 export default function App() {
-  const [history, setHistory] = useState<TurnData[]>([INITIAL_STATE]);
+  const [history, setHistory] = useState<TurnData[]>(() => {
+    const saved = localStorage.getItem("island_survival_history");
+    return saved ? JSON.parse(saved) : [INITIAL_STATE];
+  });
+  const [lastUpdate, setLastUpdate] = useState<number>(() => {
+    const saved = localStorage.getItem("island_survival_last_update");
+    return saved ? parseInt(saved, 10) : Date.now();
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intervention, setIntervention] = useState("");
+  const [timeToNext, setTimeToNext] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const currentTurn = history[history.length - 1];
 
-  const handleNextTurn = useCallback(async () => {
+  // Salva no localStorage sempre que mudar
+  useEffect(() => {
+    localStorage.setItem("island_survival_history", JSON.stringify(history));
+    localStorage.setItem("island_survival_last_update", lastUpdate.toString());
+  }, [history, lastUpdate]);
+
+  const handleNextTurn = useCallback(async (isAuto = false) => {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
-      const stateWithIntervention = { ...currentTurn, intervencao_usuario: intervention };
+      const stateWithIntervention = isAuto 
+        ? { ...currentTurn, intervencao_usuario: "A passagem do tempo (Ciclo Automático de 3h)" }
+        : { ...currentTurn, intervencao_usuario: intervention };
+        
       const nextTurn = await generateNextTurn(stateWithIntervention);
       setHistory(prev => [...prev, nextTurn]);
-      setIntervention(""); // Limpa após o uso
+      setLastUpdate(Date.now());
+      setIntervention("");
       
       setTimeout(() => {
         scrollRef.current?.scrollIntoView({ behavior: "smooth" });
       }, 100);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Falha na sincronização. A ilha está instável.");
+      setError(err.message || "A conexão com a ilha falhou.");
     } finally {
       setLoading(false);
     }
-  }, [currentTurn, intervention]);
+  }, [currentTurn, intervention, loading]);
+
+  const handleReset = () => {
+    if (confirm("Deseja realmente resetar a simulação para o Turno 1? Todo o histórico será perdido.")) {
+      setHistory([INITIAL_STATE]);
+      setLastUpdate(Date.now());
+      localStorage.removeItem("island_survival_history");
+      localStorage.removeItem("island_survival_last_update");
+    }
+  };
+
+  // Lógica de Ciclo Automático
+  useEffect(() => {
+    const checkUpdate = () => {
+      const now = Date.now();
+      const elapsed = now - lastUpdate;
+      const remaining = AUTO_UPDATE_INTERVAL - elapsed;
+
+      if (remaining <= 0) {
+        handleNextTurn(true);
+      } else {
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeToNext(`${hours}h ${minutes}m`);
+      }
+    };
+
+    checkUpdate();
+    const interval = setInterval(checkUpdate, 60000); // Checa a cada minuto
+    return () => clearInterval(interval);
+  }, [lastUpdate, handleNextTurn]);
 
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-[#e0f2f1] font-sans selection:bg-emerald-500/30 selection:text-white">
@@ -39,19 +90,32 @@ export default function App() {
       <header className="border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-50 px-6 py-4 flex justify-between items-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
         <div className="flex items-center gap-3 relative">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
-            <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+          <div className="group cursor-pointer" onClick={handleReset}>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center group-hover:bg-red-500/20 group-hover:border-red-500/30 transition-all">
+              <Activity className="w-6 h-6 text-emerald-400 group-hover:hidden animate-pulse" />
+              <RotateCcw className="w-6 h-6 text-red-400 hidden group-hover:block" />
+            </div>
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-[0.3em] uppercase text-emerald-50">Island Survival Engine</h1>
-            <p className="text-[10px] text-emerald-500/60 font-mono tracking-wider">PROTOCOL_ISLAND_05_VER</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-emerald-500/60 font-mono tracking-wider">PROTOCOL_ISLAND_05_VER</p>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-zinc-800 rounded-full">
+                <Clock className="w-2.5 h-2.5 text-zinc-500" />
+                <span className="text-[8px] text-zinc-400 font-mono uppercase tracking-tighter">Prox Ciclo: {timeToNext}</span>
+              </div>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-6 relative">
-          <div className="text-right">
-            <span className="block text-[9px] text-zinc-500 uppercase tracking-widest">Sobrevivência Turno</span>
-            <span className="text-2xl font-mono text-emerald-400 font-bold tracking-tighter">0{history.length}</span>
-          </div>
+          <button 
+            onClick={handleReset}
+            className="flex flex-col items-end group"
+            title="Resetar para Turno 1"
+          >
+            <span className="text-[9px] text-zinc-500 uppercase tracking-widest group-hover:text-red-400 transition-colors">Voltar ao Início</span>
+            <span className="text-2xl font-mono text-emerald-400 font-bold tracking-tighter group-hover:text-red-400 transition-colors">0{history.length}</span>
+          </button>
         </div>
       </header>
 
